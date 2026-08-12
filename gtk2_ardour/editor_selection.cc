@@ -1052,6 +1052,100 @@ Editor::set_selected_regionview_from_region_list (std::shared_ptr<Region> region
 	commit_reversible_selection_op () ;
 }
 
+/** Move the region selection one region along the timeline.
+ *
+ * The anchor is the selected region if there is one, so repeated calls walk
+ * along a track; with nothing selected it is the playhead, so the first call
+ * picks up wherever the transport is sitting. Searching is confined to the
+ * track the anchor region is on -- stepping sideways should not wander onto a
+ * neighbour -- and otherwise to the selected tracks, falling back to all of
+ * them when nothing at all is selected.
+ *
+ * @param dir 1 for the next region, -1 for the previous one.
+ */
+void
+Editor::select_region_relative (int32_t dir)
+{
+	if (!_session) {
+		return;
+	}
+
+	TrackViewList tracks;
+	timepos_t     pos;
+	RegionView*   anchor = 0;
+
+	if (!selection->regions.empty()) {
+
+		RegionSelection rs (selection->regions);
+		rs.sort_by_position_and_track ();
+
+		/* Step off whichever end of the selection is in the direction of
+		 * travel, so that a multi-region selection collapses onto the one
+		 * region beyond the edge the user is moving towards rather than onto
+		 * something already inside it.
+		 */
+		RegionView* rv = (dir > 0) ? rs.back() : rs.front();
+
+		/* Only if the user has not since moved elsewhere. Selecting a track
+		 * does not clear the region selection, so a region left over from a
+		 * track that is no longer selected would anchor this walk to the
+		 * track just stepped away from.
+		 */
+		if (selection->tracks.empty() || selection->tracks.contains (&rv->get_time_axis_view ())) {
+			anchor = rv;
+		}
+	}
+
+	if (anchor) {
+
+		pos = anchor->region()->position ();
+		tracks.push_back (&anchor->get_time_axis_view ());
+
+	} else {
+
+		samplepos_t ph = playhead_cursor_sample ();
+
+		/* find_next_region() is strictly greater-than, so bias the forward
+		 * search back one sample: a region starting exactly under the
+		 * playhead is the obvious answer to "next region", and a playhead
+		 * parked at the start of a region is what locating to one leaves.
+		 */
+		if (dir > 0 && ph > 0) {
+			--ph;
+		}
+
+		pos = timepos_t (ph);
+		tracks = selection->tracks.empty() ? track_views : selection->tracks;
+	}
+
+	TimeAxisView*           ontrack = 0;
+	std::shared_ptr<Region> r       = find_next_region (pos, Start, dir, tracks, &ontrack);
+
+	if (!r) {
+		return;
+	}
+
+	set_selected_regionview_from_region_list (r, SelectionSet);
+
+	/* Selecting something off the edge of the canvas is silent feedback, so
+	 * bring it into view -- vertically through the same path track selection
+	 * uses, horizontally only when it is not already on screen, and with the
+	 * region a quarter of a page in rather than flush against the edge, so
+	 * that what comes before it stays readable.
+	 */
+	if (ontrack) {
+		ensure_time_axis_view_is_visible (*ontrack, false);
+	}
+
+	samplepos_t const start = r->position().samples ();
+	samplepos_t const end   = r->end_position().samples ();
+	samplecnt_t const page  = current_page_samples ();
+
+	if (start < leftmost_sample() || end > leftmost_sample() + page) {
+		reset_x_origin (max ((samplepos_t) 0, start - page / 4));
+	}
+}
+
 bool
 Editor::set_selected_regionview_from_map_event (GdkEventAny* /*ev*/, StreamView* sv, std::weak_ptr<Region> weak_r)
 {

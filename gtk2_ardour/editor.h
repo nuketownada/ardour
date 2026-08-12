@@ -2095,6 +2095,8 @@ private:
 	void select_next_stripable (bool routes_only = true);
 	void select_prev_stripable (bool routes_only = true);
 
+	void select_region_relative (int32_t dir);
+
 	Temporal::timepos_t snap_to_minsec (Temporal::timepos_t const & start,
 	                                    Temporal::RoundMode   direction,
 	                                    ARDOUR::SnapPref    gpref) const;

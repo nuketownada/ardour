@@ -263,6 +263,9 @@ Editor::register_actions ()
 	reg_sens (editor_actions, "select-next-stripable", _("Select Next Strip"), sigc::bind (sigc::mem_fun(*this, &Editor::select_next_stripable), false));
 	reg_sens (editor_actions, "select-prev-stripable", _("Select Previous Strip"), sigc::bind (sigc::mem_fun(*this, &Editor::select_prev_stripable), false));
 
+	reg_sens (editor_actions, "select-next-region", _("Select Next Region"), sigc::bind (sigc::mem_fun(*this, &Editor::select_region_relative), 1));
+	reg_sens (editor_actions, "select-prev-region", _("Select Previous Region"), sigc::bind (sigc::mem_fun(*this, &Editor::select_region_relative), -1));
+
 	reg_sens (editor_actions, "toggle-all-existing-automation", _("Toggle All Existing Automation"), sigc::mem_fun (*this, &Editor::toggle_all_existing_automation));
 	reg_sens (editor_actions, "toggle-layer-display", _("Toggle Layer Display"), sigc::mem_fun (*this, &Editor::toggle_layer_display));
 
