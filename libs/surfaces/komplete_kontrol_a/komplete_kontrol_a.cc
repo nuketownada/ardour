@@ -17,6 +17,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 
@@ -876,8 +877,82 @@ KompleteKontrolA::handle_button (KKA::ControlID c, bool pressed)
 	case KKA::Metro:
 		toggle_click ();
 		break;
+	case KKA::Encoder4DUp:
+	case KKA::Encoder4DDown:
+	case KKA::Encoder4DLeft:
+	case KKA::Encoder4DRight:
+		editor_4d_move (c);
+		break;
+	case KKA::Encoder4DPress:
+		editor_4d_press ();
+		break;
 	default:
 		break;
+	}
+}
+
+/* The 4-D encoder's directions travel the two axes the editor lays out: tracks
+ * are stacked, so up and down step between them, and regions run along the
+ * timeline, so left and right step between those.
+ *
+ * These are Ardour's own actions rather than anything reimplemented here.
+ * access_action() emits a signal the GUI has connected in gui_context(), so it
+ * is safe to call from this thread, and the editor is doing exactly what it
+ * would do for the equivalent keystroke -- including deciding that there is
+ * nowhere to go, which is why nothing here checks first.
+ */
+void
+KompleteKontrolA::editor_4d_move (KKA::ControlID c)
+{
+	switch (c) {
+	case KKA::Encoder4DUp:
+		access_action ("Editor/select-prev-route");
+		break;
+	case KKA::Encoder4DDown:
+		access_action ("Editor/select-next-route");
+		break;
+	case KKA::Encoder4DLeft:
+		access_action ("Editor/select-prev-region");
+		break;
+	case KKA::Encoder4DRight:
+		access_action ("Editor/select-next-region");
+		break;
+	default:
+		break;
+	}
+}
+
+void
+KompleteKontrolA::editor_4d_press ()
+{
+	/* Alt+Space in the GUI: play the selected range, or the extent of the
+	 * selected regions when there is no range. It is the natural partner to
+	 * the directions above, which are how a selection gets made from here in
+	 * the first place -- step onto a region, push in, hear it.
+	 */
+	access_action ("Transport/PlaySelection");
+}
+
+void
+KompleteKontrolA::editor_4d_scroll (int steps)
+{
+	/* What Ardour's own left and right arrow keys do: one grid unit per press,
+	 * or a tenth of a page when the grid is off. Following the grid matters --
+	 * it is the only definition the editor has of "a bit further along", and
+	 * it means the encoder's feel tracks whatever the user is working at,
+	 * bar by bar or frame by frame, without a setting of our own. It also
+	 * scrolls the canvas to keep the playhead in sight, which a locate alone
+	 * would not.
+	 *
+	 * A fast spin coalesces several steps into one report -- at most eight,
+	 * the range of a 4-bit wrapping counter -- so repeat rather than moving
+	 * once per report and losing the rest of the gesture.
+	 */
+	const char* action = steps > 0 ? "Common/playhead-forward-to-grid"
+	                               : "Common/playhead-backward-to-grid";
+
+	for (int i = abs (steps); i > 0; --i) {
+		access_action (action);
 	}
 }
 
@@ -895,4 +970,6 @@ KompleteKontrolA::handle_encoder (int steps)
 	DEBUG_TRACE (DEBUG::KompleteKontrolA,
 	             string_compose ("KKA 4-D encoder %1%2\n",
 	                             steps > 0 ? "+" : "", steps));
+
+	editor_4d_scroll (steps);
 }

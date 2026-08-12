@@ -118,10 +118,20 @@ private:
 	void start_reconnect_poll ();
 	void decode (const uint8_t* payload, size_t len);
 
-	/* Phase 3 binds these; for now they trace. */
 	void handle_button (KKA::ControlID, bool pressed);
-	void handle_knob (int knob, int steps);
+	void handle_knob (int knob, int steps); /* Phase 3 binds this; for now it traces. */
 	void handle_encoder (int steps);
+
+	/* The 4-D encoder.  What each of its five gestures should do depends on
+	 * which of Ardour's pages the user is working in: strips are stacked
+	 * vertically in the editor and side by side in the mixer, so left/right
+	 * there is what up/down is here.  The editor's bindings therefore live in
+	 * their own methods rather than inline in the dispatch above, ready for
+	 * that branch.  The editor is the only page bound so far.
+	 */
+	void editor_4d_move (KKA::ControlID);
+	void editor_4d_press ();
+	void editor_4d_scroll (int steps);
 
 	hid_device* _handle;
 
